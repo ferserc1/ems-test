@@ -12,6 +12,9 @@
 
 - Linux/WSL: con apt-get, instalar python3, cmake y git. Si tienes una verisón de node instalada en el sistema, puedes usarla ajustando el atributo NODE_JS en el archivo .emscripten
 
+Mi recomendación es que si trabajas en Windows uses WSL. Aparte de que la instalación y configuración es más sencilla, hay pasos al final de este documento en los que hay que ejecutar un script de shell desde npm. Esta parte, tal cual está, solamente lo he probado desde Mac y Linux, y en Windows habría que hacer algunos cambios.
+
+
 ### Instalar
 
 El SDK se puede descargar en zip, pero si lo descargamos desde github será más fácil actualizar:
@@ -26,6 +29,8 @@ cd emsdk
 source ./emsdk_env.sh
 ```
 
+El script `emsdk_env.sh` solamente registra las rutas al compilador emscripten en el path. Si quieres tenerlas disponibles, tendrías que llamar al script en el fichero  `rc` de tu shell (`.bashrc`, `.zshrc`, etc).
+
 **Windows**:
 
 ```sh
@@ -35,6 +40,8 @@ emsdk install latest
 emsdk activate latest
 emsdk_env.bat
 ```
+
+El script `emsdk_env.bat` solamente registra las rutas al compilador emscripten en el path. Si quieres tenerlas disponibles siempre, tendrías que ejecutarlo al inicio.
 
 ### Actualizar
 
