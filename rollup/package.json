@@ -1,0 +1,16 @@
+{
+  "name": "rollup-wasm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "ems": "./build.sh",
+    "build": "(npm run ems) & rollup -c --watch"
+  },
+  "author": "Fernando Serrano Carpena",
+  "license": "MIT",
+  "dependencies": {
+    "rollup": "^2.67.0",
+    "rollup-plugin-copy": "^3.4.0"
+  }
+}

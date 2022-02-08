@@ -1,0 +1,11 @@
+node_modules
+*.wasm
+*.wast
+build
+
+*/web/gen/*
+test++/hello.js
+test/a.out.js
+rollup/dist
+modularize/fib.js
+modularize/fib.wasm

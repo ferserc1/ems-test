@@ -1,0 +1,15 @@
+<html>
+    <body>
+        <script src="gen/main.js"></script>
+        <script>
+            fib = Module.cwrap('fib','number',['number']);
+
+            Module.onRuntimeInitialized = () => {
+                console.log("fib(10): " + fib(10));
+
+                const result = Module.ccall('fib', 'number', ['number'],[12]);
+                console.log("fib(12): " + result);
+            }
+        </script>
+    </body>
+</html>
