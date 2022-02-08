@@ -1,9 +1,10 @@
 #include <emscripten.h>
 #include <iostream>
 
-EMSCRIPTEN_KEEPALIVE
+
 extern "C" {
 
+EMSCRIPTEN_KEEPALIVE
 int fib(int x) {
     if (x < 1) {
         return 0;

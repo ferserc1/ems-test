@@ -543,5 +543,108 @@ const moduleInstance = await NombreDeModulo();
 moduleInstance._wasmFunction();
 ```
 
+## Paso de parámetros: strings
+
+Vamos a partir de dos funciones en C que reciben y devuelven un string
+
+```c++
+EMSCRIPTEN_KEEPALIVE
+void printString(char * text, int n)
+{
+    std::cout << "Text printed from C: " << text << ", number: " << n << std::endl;
+}
+
+EMSCRIPTEN_KEEPALIVE
+char * getString()
+{
+    std::string testString = "Hello World!, from C++";
+    char * resultString = new char[testString.size()];
+    strcpy(resultString, testString.c_str());
+    return resultString;
+}
+```
+
+Para pasar un string desde JS a C tenemos dos formas:
+
+```js
+const message = "This is a string passed form JS to C";
+const messagePtr = instance.allocate(instance.intArrayFromString(message), instance.ALLOC_NORMAL);
+instance._printString(messagePtr,1);
+instance._free(messagePtr); // Hay que borrar la memoria que hemos alojado
+```
+
+```js
+const message = "This is another test string, passed from JS to C";
+insatnce.ccall('printString',null,['string','number'],[message,2]);
+// También se puede usar cwrap y luego llamar a la función
+```
+
+Con `ccall` y `cwrap` es más fácil, porque la propia función se encarga de convertir los strings.
+
+Pero para devolver un string hay que tener en cuenta que la función `getString` devuelve una dirección de memoria reservada en el heap (hemos hecho un `new char[testString.size()]`). Podemos obtener el string así:
+
+```js
+const stringFromC = instance.call('getString','string',[]);
+console.log(stringFromC);
+```
+
+Pero esto va a provocar un memory leak: el string que se devuelve y que se ha creado en la pila, nunca se libera.
+
+Es posible acceder al heap y convertir su contenido en un typed array. Esto es una posible primera aproximación para obtener strings (o también cualquier otro tipo de punteros) desde C, el problema es que desde C tenemos que traer dos cosas: el punter y el tamaño del string:
+
+```js
+const strPtr = instance._getString();
+let done = false;
+let offset = 0;
+const chunkSize = 10;
+let stringFromC2 = "";
+while (!done) {
+    const chunk = new Uint8Array(instance.HEAPU8.buffer, strPtr + offset, chunkSize);
+    const text = new TextDecoder().decode(chunk);
+    const endl = text.indexOf('\0');
+    if (endl != -1) {
+        done = true;
+        stringFromC2 += text.substring(0,endl);
+    }
+    else {
+        stringFromC2 += text;
+    }
+    offset += chunkSize;
+}
+console.log(stringFromC2);
+instance._free(strPtr); // Ahora ya podemos borrar el puntero
+```
+
+Este código es brutalmente engorroso, sí, pero nos da una pista de cómo debemos preparar nuestra API de C: si tenemos que devolver punteros al heap, lo mejor es obtener por un lado el puntero y por otro su tamaño
+
+```js
+const ptrData = instance._myGetDataPointer();
+const size = instance._myGetDataSize();
+const data = new Uint8Array(instance.HEAPU8.buffer, ptrData, size);
+// A partir de data ya podemos convertirlo al tipo de array que sea
+// Por ejemplo, para un string
+const string = new TextDecoder().decode(data);
+```
+
+## Bonus: usar VS Code
+
+En general, Visual Studio Code funciona bien solamente instalando las extensiones recomendadas de Microsoft para C/C++, pero intellisense no funcionará bien.
+
+Si compilas cualquier fichero con `emcc -v` se mostrará la lista de rutas de inclusión:
+
+```sh
+emcc -v test.c
+...
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include/SDL
+ /home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include/compat
+ /home/fernando/desarrollo/emsdk/upstream/lib/clang/14.0.0/include
+ /home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include
+End of search list.
+...
+```
+
+Esa es la ruta de la instalación de emscripten, que dependerá del PC donde se haya instalado. Con esta información, en los ajustes de directorios de inclusión de C++, puedes añadir las rutas para que intellisense detecte las cabeceras de emscripten.
 
 

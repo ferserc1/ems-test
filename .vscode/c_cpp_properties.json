@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include/SDL",
+                "/home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include/compat",
+                "/home/fernando/desarrollo/emsdk/upstream/lib/clang/14.0.0/include",
+                "/home/fernando/desarrollo/emsdk/upstream/emscripten/cache/sysroot/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
