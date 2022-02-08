@@ -17,5 +17,6 @@ const loadScript = () => {
 loadScript().then(() => {
     FibModule().then(instance => {
         console.log(`fib(12) = ${instance._fib(12)}`);
+        instance._fib2();
     });
 });

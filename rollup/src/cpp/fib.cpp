@@ -18,6 +18,7 @@ EMSCRIPTEN_KEEPALIVE
 int fib2(int y) {
     int r = fib(y);
     std::cout << "Hello" << std::endl;
+    std::cerr << "Esto es un error" << std::endl;
     return r * r;
 }
 
