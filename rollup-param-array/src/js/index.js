@@ -64,9 +64,62 @@ loadScript().then(() => {
         instance._free(strPtr); // Ahora ya podemos borrar el puntero
         
 
-        const arrayResult = instance._getArrayTest(20,3.4);
-        instance.cwrap;
-        console.log(arrayResult);
+        // Prueba de estructura de datos compleja
+        // Los datos en C tienen esta forma;
+        //  {
+        //      float number;
+        //      int * intArray;
+        //      int arraySize;
+        //  }
+        const structPtr = instance._getComplexData();
+        // float + int ptr + int = 4 bytes + 4 bytes + 4 bytes
+        const structFloatPtr = structPtr;
+        const structIntArrayPtrPtr = structPtr + 4;
+        const structArraySizePtr = structPtr + 8;
+
+        const structFloat = new Float32Array(instance.HEAPU8.buffer, structFloatPtr, 1)[0];
+        const structIntArrayPtr = new Uint32Array(instance.HEAPU8.buffer, structIntArrayPtrPtr, 1)[0];
+        const structArraySize = new Int32Array(instance.HEAPU8.buffer, structArraySizePtr, 1)[0];
+
+        const structIntArray = new Int32Array(instance.HEAPU8.buffer, structIntArrayPtr, structArraySize);
+
+        console.log(`Struct float value: ${structFloat}`);
+        console.log(structIntArray);
+        console.log(`Struct array length: ${structArraySize}`);
+
+        // Todo lo que se reserva en C tiene que borrarse. Si no se va a borrar en C, hay
+        // que borrarlo en JS
+        instance._free(structIntArrayPtr);  // El puntero al array, se crea con malloc(sizeof(int) *  arraySize)
+        instance._free(structPtr); // El struct se crea con new ComplexData
+        
+        // En este ejemplo, se obtiene un array desde C. Usamos la técnica de devolver
+        // en el primer elemento del array, el tamaño del mismo. En este caso es
+        // un array de floats
+        const testArrayPtr = instance._getArrayTest(30, 2 * 3.141592);
+        const testArraySize = new Float32Array(instance.HEAPU8.buffer, testArrayPtr, 1)[0];
+        const testArray = new Float32Array(instance.HEAPU8.buffer, testArrayPtr + 4, testArraySize);
+        console.log(`test array length: ${testArraySize}`);
+        console.log(testArray);
+
+        // En C el array se reserva con malloc(sizeof(float) * (size + 1))
+        instance._free(testArrayPtr);
+
+        const fArrayPtr = instance._getFloatArray(50, 1.33);
+        const fArraySize = new Int32Array(instance.HEAPU8.buffer, fArrayPtr, 1)[0];
+        const fArrayDataPtr = new Uint32Array(instance.HEAPU8.buffer, fArrayPtr + 4, 1)[0];
+        const fArrayData = new Float32Array(instance.HEAPU8.buffer, fArrayDataPtr, fArraySize);
+
+        console.log(fArrayData);
+
+        instance._freeFloatArray(fArrayPtr);
+
+        const jsArray = [3.4, 5.5, 7.43, 9.09, 0.122, 34.18];
+        const jsTypedArray = new Float32Array(jsArray);
+        const jsToCPtr = instance._malloc(jsTypedArray.length * jsTypedArray.BYTES_PER_ELEMENT);
+        instance.HEAPF32.set(jsTypedArray, jsToCPtr / 4);
+        instance._printFloatArray(jsToCPtr, jsArray.length);
+        instance._free(jsToCPtr);
+
     });
 });
 

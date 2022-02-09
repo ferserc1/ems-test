@@ -75,6 +75,30 @@ Module['ready'] = new Promise(function(resolve, reject) {
       }
     
 
+      if (!Object.getOwnPropertyDescriptor(Module['ready'], '_getFloatArray')) {
+        Object.defineProperty(Module['ready'], '_getFloatArray', { configurable: true, get: function() { abort('You are getting _getFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+        Object.defineProperty(Module['ready'], '_getFloatArray', { configurable: true, set: function() { abort('You are setting _getFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+      }
+    
+
+      if (!Object.getOwnPropertyDescriptor(Module['ready'], '_freeFloatArray')) {
+        Object.defineProperty(Module['ready'], '_freeFloatArray', { configurable: true, get: function() { abort('You are getting _freeFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+        Object.defineProperty(Module['ready'], '_freeFloatArray', { configurable: true, set: function() { abort('You are setting _freeFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+      }
+    
+
+      if (!Object.getOwnPropertyDescriptor(Module['ready'], '_getComplexData')) {
+        Object.defineProperty(Module['ready'], '_getComplexData', { configurable: true, get: function() { abort('You are getting _getComplexData on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+        Object.defineProperty(Module['ready'], '_getComplexData', { configurable: true, set: function() { abort('You are setting _getComplexData on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+      }
+    
+
+      if (!Object.getOwnPropertyDescriptor(Module['ready'], '_printFloatArray')) {
+        Object.defineProperty(Module['ready'], '_printFloatArray', { configurable: true, get: function() { abort('You are getting _printFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+        Object.defineProperty(Module['ready'], '_printFloatArray', { configurable: true, set: function() { abort('You are setting _printFloatArray on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
+      }
+    
+
       if (!Object.getOwnPropertyDescriptor(Module['ready'], '___stdio_exit')) {
         Object.defineProperty(Module['ready'], '___stdio_exit', { configurable: true, get: function() { abort('You are getting ___stdio_exit on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
         Object.defineProperty(Module['ready'], '___stdio_exit', { configurable: true, set: function() { abort('You are setting ___stdio_exit on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js') } });
@@ -4926,13 +4950,25 @@ var _getArrayTest = Module["_getArrayTest"] = createExportWrapper("getArrayTest"
 var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 
 /** @type {function(...*):?} */
+var _getComplexData = Module["_getComplexData"] = createExportWrapper("getComplexData");
+
+/** @type {function(...*):?} */
+var _getFloatArray = Module["_getFloatArray"] = createExportWrapper("getFloatArray");
+
+/** @type {function(...*):?} */
+var _freeFloatArray = Module["_freeFloatArray"] = createExportWrapper("freeFloatArray");
+
+/** @type {function(...*):?} */
+var _free = Module["_free"] = createExportWrapper("free");
+
+/** @type {function(...*):?} */
+var _printFloatArray = Module["_printFloatArray"] = createExportWrapper("printFloatArray");
+
+/** @type {function(...*):?} */
 var ___errno_location = Module["___errno_location"] = createExportWrapper("__errno_location");
 
 /** @type {function(...*):?} */
 var ___stdio_exit = Module["___stdio_exit"] = createExportWrapper("__stdio_exit");
-
-/** @type {function(...*):?} */
-var _free = Module["_free"] = createExportWrapper("free");
 
 /** @type {function(...*):?} */
 var _emscripten_stack_init = Module["_emscripten_stack_init"] = function() {

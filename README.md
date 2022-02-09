@@ -626,6 +626,232 @@ const data = new Uint8Array(instance.HEAPU8.buffer, ptrData, size);
 const string = new TextDecoder().decode(data);
 ```
 
+## Devolver structs
+
+Para el caso de los structs, podemos obtener su contenido utilizando typed arrays de la misma forma que hacemos con los strings. Lo que tenemos que tener en cuenta es la estructura interna de los structs en C.
+
+El siguiente array:
+
+```c
+typedef struct ComplexDataT {
+    float number;
+    int * intArray;
+    int arraySize;
+} ComplexData;
+```
+
+La estructura interna es la siguiente:
+
+- 4 bytes para almacenar `number`
+- 4 bytes para almacenar el puntero a `intArray`. En webassembly los punteros son de 32 bits
+- 4 bytes para el tamaño del array. En webassembly los tipos enteros son de tamaño fijo a 32 bits
+
+Aparte de esto, tenemos el puntero interno `intArray`, que tendríamos que obtener de forma independiente.
+
+La función en C que devuelve este struct es así:
+
+```c++ 
+EMSCRIPTEN_KEEPALIVE
+ComplexData * getComplexData()
+{
+    ComplexData * result = new ComplexData;
+
+    result->number = 3.141592f;
+    result->arraySize = 20;
+    result->intArray = (int*)malloc(sizeof(int) * result->arraySize);
+    for (int i = 0; i < result->arraySize; ++i) {
+        result->intArray[i] = i * 2;
+    }
+
+    return result;
+}
+```
+
+En esta función reservamos memoria dos veces: una para la estructura `ComplexData` y otra para almacenar el array. Esto tenemos que tenerlo en cuenta, porque en este ejemplo, con esta implementación, vamos a perder la pista de ambos punteros desde C, y tendremos que borrarlos en JavaScript.
+
+Para recoger el struct y el array que contiene en JavaScript, seguimos la misma estrategia que en la sección anterior: obtener los punteros y recoger los datos mediante typed arrays:
+
+```js
+const structPtr = instance._getComplexData();   // llamada a la función
+const structFloatPtr = structPtr;
+const structIntArrayPtrPtr = structPtr + 4;
+const structArraySizePtr = structPtr + 8;
+
+// El valor del float, que obtenemos directos del struct
+const structFloat = new Float32Array(instance.HEAPU8.buffer, structFloatPtr, 1)[0];
+
+// El puntero al array de int. El array lo obtenemos indirectamente
+const structIntArrayPtr = new Uint32Array(instance.HEAPU8.buffer, structIntArrayPtrPtr,1)[0];
+
+// El tamaño del array, tambien lo obtenemos directos del struct
+const structArraySize = new Int32Array(instance.HEAPU8.buffer, structArraySizePtr, 1)[0];
+
+// Obtenemos el array, a partir de su puntero y con el tamaño del array. En este caso,
+// el struct está diseñado para obtener también el tamaño del array, lo que facilita
+// mucho las cosas. A veces tendremos que diseñar los datos que se devuelven con idea
+// de que van a obtenerse en JS.
+const structIntArray = new Int32Array(instance.HEAPU8.buffer, structIntArrayPtr, structArraySize);
+
+console.log(structFloat);       // 3.141592
+console.log(structIntArray);    // 0, 2, 4, 6, 8...
+console.log(structArraySize);   // 20
+
+// Recuerda: todo lo que reservas en C que no se vaya a borrar en C, hay que borrarlo
+// en JS
+instance._free(structIntArrayPtr);
+instance._free(structPtr);
+```
+
+## Pensar bien los datos que se intercambian
+
+Si somos un poco hábiles, es posible simplificar bastante (e incluso mejorar el rendimiento) el intercambio de datos entre C y JS.
+
+En el siguiente ejemplo, obtenemos un array desde C. La técnica que se usa es reservar un elemento más de la cuenta, y usar el primer elemento para guardar el tamaño. En este caso es un array de coma flotante, pero estrictamente hablando, en JavaScript todos los números son coma flotante de doble precisión: en realidad no pasa nada por usar un float para almacenar un tamaño de array, que será un número entero:
+
+```C
+EMSCRIPTEN_KEEPALIVE
+float *getArrayTest(int size, float fillValue) {
+    float * result = (float*)malloc(sizeof(float) * (size + 1));
+    result[0] = (float)size;
+    for (int i = 1; i < size + 1; ++i)
+    {
+        result[i] = fillValue;
+    }
+    return result;
+}
+```
+
+Desde JavaScript leemos el primer elemento del array, que será el tamaño, y con este dato ya podemos obtener el resto de datos:
+
+```js
+ const testArrayPtr = instance._getArrayTest(30, 2 * 3.141592);
+const testArraySize = new Float32Array(instance.HEAPU8.buffer, testArrayPtr, 1)[0];
+const testArray = new Float32Array(instance.HEAPU8.buffer, testArrayPtr + 4, testArraySize);
+console.log(`test array length: ${testArraySize}`);
+console.log(testArray);
+
+// En C el array se reserva con malloc(sizeof(float) * (size + 1))
+instance._free(testArrayPtr);
+```
+
+Podemos usar un código JavaScript muy similar, si usamos un struct para codificar arrays: el primer elemento sería el tamaño, y el resto el contenido:
+
+```C
+typedef struct FloatArrayT {
+    unsigned int size;
+    float * data;
+} FloatArray;
+```
+
+El código JS será más complicado, ya que el resto del array es un puntero:
+
+```js
+const testArrayPtr = instance._getArrayTest(30, 2 * 3.141592);
+const testArraySize = new Uint32Array(instance.HEAPU8.buffer, testArrayPtr, 1)[0];
+const testArrayDataPtr = new Uint32Array(instance.HEAPU8.buffer, testArrayPtr + 4, 1)[0];
+const testArrayData = new Float32Array(instance.HEAPU8.buffer, testArrayDataPtr, testArraySize);
+console.log(testArrayData);
+
+// Ojo: aquí hay que borrar el array y el struct
+instance._free(testArrayDataPtr);
+instance._free(testArrayPtr);
+```
+
+## Tratamiento de memoria en valores de retorno
+
+Una recomendación: si en C se crean estructuras más o menos complejas, es mejor que se borren también desde C. En el ejemplo del struct, es preferible tener una función en C que se encargue de liberar la memoria, de esa forma la reserva y la liberación quedan en la misma parte del código:
+
+```C++
+typedef struct FloatArrayT {
+    unsigned int length;
+    float * data;
+} FloatArray;
+
+EMSCRIPTEN_KEEPALIVE
+FloatArray * getFloatArray(int size, float initialValue)
+{
+    FloatArray * result = (FloatArray*)malloc(sizeof(FloatArray));
+    result->length = size;
+    result->data = (float*)malloc(sizeof(float) * size);
+    for (int i = 0; i < size; ++i) {
+        result->data[i] = initialValue;
+    }
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void freeFloatArray(FloatArray * arrayPtr)
+{
+    free(arrayPtr->data);
+    free(arrayPtr);
+}
+```
+
+En este caso, la liberación de la memoria la hacemos con la función exportada desde C:
+
+```js
+const fArrayPtr = instance._getFloatArray(50, 1.33);
+const fArraySize = new Int32Array(instance.HEAPU8.buffer, fArrayPtr, 1)[0];
+const fArrayDataPtr = new Uint32Array(instance.HEAPU8.buffer, fArrayPtr + 4, 1)[0];
+const fArrayData = new Float32Array(instance.HEAPU8.buffer, fArrayDataPtr, fArraySize);
+
+console.log(fArrayData);
+
+instance._freeFloatArray(fArrayPtr);
+```
+
+## Pasar arrays a desde JS a C
+
+El procedimiento es muy similar. Básicamente consiste en reservar un espacio de memoria en el heap que usa WebAssembly, y pasar esa dirección de memoria, que en C tenemos que tratar como una dirección de memoria. Al igual que ocurre a la inversa, en C tendremos que conocer el tamaño del array que estamos pasando, pero en este caso es más sencillo porque podemos pasar ese tamaño como otro parámetro más.
+
+En este caso, para pasar los valores al heap, vamos a utilizar una vista al heap en formato Float32. En realidad existen varias vistas al heap. Todas apuntan a la misma zona de la memoria, pero utilizaremos una u otra dependiendo del tipo de datos que queramos leer o escribir.
+
+```C
+EMSCRIPTEN_KEEPALIVE
+void printFloatArray(float * arrayPtr, int length)
+{
+    std::cout << "Printing floating point array from C:" << std::endl << "[ ";
+    for (int i = 0; i < length; ++i)
+    {
+        std::cout << arrayPtr[i];
+        if (i < length - 1)
+        {
+            std::cout << ", ";
+        }
+        else
+        {
+            std::cout << " ]" << std::endl;
+        }
+    }
+}
+```
+
+```js
+const jsArray = [3.4, 5.5, 7.43, 9.09, 0.122, 34.18];
+const jsTypedArray = new Float32Array(jsArray);
+const jsToCPtr = instance._malloc(jsTypedArray.length * jsTypedArray.BYTES_PER_ELEMENT);
+instance.HEAPF32.set(jsTypedArray, jsToCPtr >> 2);
+instance._printFloatArray(jsToCPtr, jsArray.length);
+instance._free(jsToCPtr);
+```
+
+Algunas notas sobre el código anterior:
+
+- `_malloc`: es lo mismo que haríamos en C, sirve para reservar memoria. Hemos utilizado un typed array, así que el tamaño que queremos es el tamaño del array, multiplicado por el número de bytes por elemento. En C el códito sería el siguiente:
+
+```c
+float * jsToCPtr = (float*) malloc(arrayLength * sizoef(float));
+```
+
+- `HEAPF32`: es la vista del heap. Hasta ahora usábamos la vista de bytes (`HEAPU8`, unsigned 8 bits). Como vamos a pasar un array de float, en este caso usamos la vista `HEAPF32` (float 32 bits).
+- `HEAPF32.set`: el primer parámetro es el contenido que queremos pasar, en este caso, el typed array, que contiene los datos que hemos convertido desde el array nativo de JavaScript (`jsArray`). El segundo parámetro es la dirección de memoria, pero hay que tener en cuenta una cosa: las direcciones obtenidas con `_malloc` son a nivel de un byte, que pueden usarse directamente con `HEAPU8` porque también es una vista de un byte. Sin embargo, `HEAPF32` usa direcciones de 4 bytes. Con la operación de desplazamiento `<< 2` lo que hacemos es dividir la dirección de memoria entre 4. Sería equivalente a esto:
+
+```js
+instance.HEAPF32.set(jsTypedArray, jsToCPtr / 4);
+```
+
+- `_free`: evidentemente, después de un malloc hay que hacer un free. 
+
 ## Bonus: usar VS Code
 
 En general, Visual Studio Code funciona bien solamente instalando las extensiones recomendadas de Microsoft para C/C++, pero intellisense no funcionará bien.
