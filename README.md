@@ -241,6 +241,19 @@ Modificamos el script de compilación para añadir el fichero `fib.cpp`. Usamos 
 em++ ../cpp/main.cpp  ../cpp/fib.cpp -s WASM=1 -o main.js || exit 1
 ```
 
+**IMPORTANTE:** Antes de que te vuelvas loco intentando meter la opción `-I` para incluir rutas de búsqueda de archivos de cabecera, ten en cuenta que `emcc` pasa parte de los parámetros a `llvm`, pero a partir de `-o`, cuando se especifica el fichero de salida, son parámetros para el compilador de webassembly que no van a llegar a llvm. Por lo tanto, si haces esto:
+
+```sh
+emcc file1.c file2.c -o lib.js -Iheader/path -s ...otras opciones...
+```
+
+...llvm no va a encontrar la ruta de los ficheros de cabecera. Para que funcione, tienes que poner el parámetro ANTES de llegar al `-o`, por ejemplo, antes de la lista de ficheros
+
+```sh
+emcc -Iheader/path file1.c file2.c -o lib.js -s ...otras opciones...
+```
+
+
 ## Desensamblar
 
 Nota: esto funciona, pero no le hagas mucho caso. Para exportar funciones a JS no hace falta. Puedes saltarte esta sección.
@@ -874,3 +887,18 @@ End of search list.
 Esa es la ruta de la instalación de emscripten, que dependerá del PC donde se haya instalado. Con esta información, en los ajustes de directorios de inclusión de C++, puedes añadir las rutas para que intellisense detecte las cabeceras de emscripten.
 
 
+## Nota: Depurar en Mac con procesador Apple Silicon
+
+Para depurar el código wasm, la forma más cómoda es tener una pequeña aplicación nativa con código C. En este caso, es importante configurar correctamente el depurador en Visual Studio.
+
+Con las extensiones de C++ de Microsoft funciona todo menos la depuración. La solución está en instalar la extensión `CodeLLDB`, y en el fichero `launch.json` configurar el tipo de depurador `lldb`:
+
+```json
+{
+    ...
+    "type": "lldb",
+    ...
+}
+```
+
+En general, se puede utilizar esta extensión no solo para los Mac con procesador Apple Silicon, sino también para cualquier sitio donde utilicemos clang y lldb.
