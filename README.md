@@ -641,6 +641,38 @@ const string = new TextDecoder().decode(data);
 
 ## Devolver structs
 
+**MUCHÍSIMO OJO CON ESTO**: Cuando obtenemos un typed array desde C, estamos apuntando al heap de WebAssembly. Si queremos usar esos datos en JavaScript es **MUY IMPORTANTE** copiar esos datos, por ejemplo, pasando el array a un array normal de JavaScript:
+
+```js
+getIntArray(ptr,count) {
+    if (ptr) {
+        // new Int32Array es una vista del heap, así que no copia nada. Si luego se borra del heap
+        // esa zona de memoria, el contenido de la vista no será válido
+        const data = new Int32Array(this.instance.HEAPU8.buffer, ptr, count);
+        // Por eso aquí convertimos ese array a otro array normal
+        return Array.from(data);
+    }
+    else {
+        return []
+    }
+}
+```
+
+```js
+const strSize = new Int32Array(this.instance.HEAPU8.buffer, structPtr, 1)[0];
+    const strPtr = new Int32Array(this.instance.HEAPU8.buffer, structPtr + 4)[0];
+    // Aquí igual: new Uint8Array es una vista del heap.
+    const strData = new Uint8Array(this.instance.HEAPU8.buffer, strPtr, strSize);
+    // Con el TextDecoder().decode() estamos copiando esos datos a un array de
+    // JavaScript, con lo que dejamos de hacer referencia al heap
+    const str = new TextDecoder().decode(strData);
+    this.instance._freeString(structPtr, this._debug ? 1 : 0);
+    return str;
+}
+```
+
+Ten en cuenta esto siempre: `new XXXArray(instance.HEAPXX...)` se limita a crear una vista, no hace una copia.
+
 Para el caso de los structs, podemos obtener su contenido utilizando typed arrays de la misma forma que hacemos con los strings. Lo que tenemos que tener en cuenta es la estructura interna de los structs en C.
 
 El siguiente array:
